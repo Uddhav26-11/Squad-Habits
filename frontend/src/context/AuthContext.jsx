@@ -8,7 +8,7 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   const loadUser = async () => {
-    const token = localStorage.getItem("token");
+    const token = sessionStorage.getItem("token");
     if (!token) {
       setUser(null);
       setLoading(false);
@@ -18,7 +18,7 @@ export function AuthProvider({ children }) {
       const res = await api.get("/auth/me");
       setUser(res.data.user);
     } catch (err) {
-      localStorage.removeItem("token");
+      sessionStorage.removeItem("token");
       setUser(null);
     } finally {
       setLoading(false);
@@ -30,12 +30,12 @@ export function AuthProvider({ children }) {
   }, []);
 
   const login = async (token) => {
-    localStorage.setItem("token", token);
+    sessionStorage.setItem("token", token);
     await loadUser();
   };
 
   const logout = () => {
-    localStorage.removeItem("token");
+    sessionStorage.removeItem("token");
     setUser(null);
   };
 
