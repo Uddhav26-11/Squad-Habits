@@ -8,6 +8,7 @@ const {
   countMissedThisWeek,
   getLastActiveDate,
   toDateKey,
+  utcToday,
 } = require("../utils/habitStats");
 
 exports.createHabit = async (req, res) => {
@@ -95,7 +96,7 @@ exports.getHabitsForSquad = async (req, res) => {
       completed: true,
     });
 
-    const todayKey = toDateKey(new Date());
+    const todayKey = toDateKey(utcToday());
     const completedTodaySet = new Set(
       logs
         .filter((log) => toDateKey(new Date(log.date)) === todayKey)
@@ -125,10 +126,11 @@ exports.toggleComplete = async (req, res) => {
     const habit = await Habit.findById(habitId);
     if (!habit) return res.status(404).json({ message: "Habit not found" });
 
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const todayEnd = new Date();
-    todayEnd.setHours(23, 59, 59, 999);
+    // Use UTC day boundaries so this matches toDateKey()'s UTC-based
+    // grouping used everywhere else (streaks, completion rate, leaderboard).
+    const todayStart = utcToday();
+    const todayEnd = new Date(todayStart);
+    todayEnd.setUTCHours(23, 59, 59, 999);
 
     let log = await HabitLog.findOne({
       habitId,
@@ -164,7 +166,7 @@ exports.getLeaderboard = async (req, res) => {
     const habitIds = habits.map((h) => h._id.toString());
     const logs = await HabitLog.find({ habitId: { $in: habits.map((h) => h._id) } });
 
-    const todayKey = toDateKey(new Date());
+    const todayKey = toDateKey(utcToday());
 
     const leaderboard = squad.members.map((member) => {
       const userLogs = logs.filter((log) => log.userId.toString() === member._id.toString());
@@ -195,7 +197,14 @@ exports.getLeaderboard = async (req, res) => {
       };
     });
 
-    leaderboard.sort((a, b) => b.streak - a.streak || b.completionRate - a.completionRate);
+    // Priority: 1) highest streak, 2) highest completion rate,
+    // 3) tie-break by name (stable, deterministic — no stale ordering).
+    leaderboard.sort(
+      (a, b) =>
+        b.streak - a.streak ||
+        b.completionRate - a.completionRate ||
+        a.name.localeCompare(b.name)
+    );
     leaderboard.forEach((entry, idx) => (entry.rank = idx + 1));
 
     res.json({ leaderboard });
@@ -239,7 +248,12 @@ exports.getMemberStats = async (req, res) => {
       };
     });
 
-    members.sort((a, b) => b.streak - a.streak || b.completionRate - a.completionRate);
+    members.sort(
+      (a, b) =>
+        b.streak - a.streak ||
+        b.completionRate - a.completionRate ||
+        a.name.localeCompare(b.name)
+    );
 
     res.json({ members });
   } catch (err) {
@@ -257,7 +271,7 @@ exports.getSquadAnalytics = async (req, res) => {
     const habitIds = habits.map((h) => h._id.toString());
     const logs = await HabitLog.find({ habitId: { $in: habits.map((h) => h._id) } });
 
-    const todayKey = toDateKey(new Date());
+    const todayKey = toDateKey(utcToday());
 
     let worstMember = null;
     let worstMissed = -1;
@@ -350,7 +364,7 @@ exports.getDashboardStats = async (req, res) => {
       bestStreak = Math.max(bestStreak, streak);
       totalCompletionRate += rate;
 
-      const todayKey = toDateKey(new Date());
+      const todayKey = toDateKey(utcToday());
       todayCompleted += myLogs.filter(
         (log) => log.completed && toDateKey(new Date(log.date)) === todayKey
       ).length;

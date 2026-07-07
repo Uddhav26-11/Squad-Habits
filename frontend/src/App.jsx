@@ -9,6 +9,7 @@ import Dashboard from "./pages/Dashboard";
 import Squad from "./pages/Squad";
 import JoinSquad from "./pages/JoinSquad";
 import Leaderboard from "./components/Leaderboard";
+import Profile from "./pages/Profile";
 
 function App() {
   return (
@@ -20,9 +21,9 @@ function App() {
           <Route path="/login" element={<Login />} />
 
           {/* Google OAuth Callback */}
-          <Route 
-            path="/auth/callback" 
-            element={<AuthCallback />} 
+          <Route
+            path="/auth/callback"
+            element={<AuthCallback />}
           />
 
           {/* Protected Dashboard */}
@@ -78,7 +79,7 @@ function App() {
             path="/leaderboard"
             element={
               <ProtectedRoute>
-                <LeaderboardPage />
+                <Leaderboard />
               </ProtectedRoute>
             }
           />
