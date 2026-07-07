@@ -3,6 +3,7 @@ require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
+const path = require("path");
 
 const passport = require("./config/passport");
 
@@ -21,13 +22,17 @@ app.use("/auth", require("./routes/authRoutes"));
 app.use("/squad", require("./routes/squadRoutes"));
 app.use("/habit", require("./routes/habitRoutes"));
 
-app.get("/", (req, res) => {
+// API health check (moved to /api/health so it doesn't block the frontend at "/")
+app.get("/api/health", (req, res) => {
   res.json({ message: "Squad Habits API is running" });
 });
 
-// 404 handler
-app.use((req, res) => {
-  res.status(404).json({ message: "Route not found" });
+// Serve the built frontend (frontend/dist) in production
+const frontendDist = path.join(__dirname, "../frontend/dist");
+app.use(express.static(frontendDist));
+
+app.get(/^(?!\/(auth|squad|habit|api)).*/, (req, res) => {
+  res.sendFile(path.join(frontendDist, "index.html"));
 });
 
 // Global error handler
