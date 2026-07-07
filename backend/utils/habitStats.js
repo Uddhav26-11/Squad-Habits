@@ -27,7 +27,6 @@ function calculateStreak(logs, habitIds) {
   const cursor = new Date();
   cursor.setHours(0, 0, 0, 0);
 
-  // Don't break streak just because today isn't finished yet
   if (!isDayComplete(map, habitIds, cursor)) {
     cursor.setDate(cursor.getDate() - 1);
   }
@@ -83,9 +82,21 @@ function countMissedThisWeek(logs, habitIds, days = 7) {
   return missed;
 }
 
+function getLastActiveDate(logs) {
+  const completedLogs = logs.filter((log) => log.completed);
+  if (completedLogs.length === 0) return null;
+
+  const latest = completedLogs.reduce((latestLog, log) => {
+    return new Date(log.date) > new Date(latestLog.date) ? log : latestLog;
+  });
+
+  return toDateKey(new Date(latest.date));
+}
+
 module.exports = {
   toDateKey,
   calculateStreak,
   calculateWeeklyCompletionRate,
   countMissedThisWeek,
+  getLastActiveDate,
 };

@@ -17,10 +17,14 @@ function Login() {
   const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
   const handleGoogleLogin = () => {
-   window.location.href =
+    // ProtectedRoute already stashed the intended destination (if any) in
+    // sessionStorage before redirecting here — AuthCallback will read it
+    // once Google sends the user back.
+    window.location.href =
       "https://2gbrq124-5000.inc1.devtunnels.ms/auth/google";
 
   };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -50,7 +54,10 @@ function Login() {
 
       const res = await api.post(endpoint, payload);
       await login(res.data.token);
-      navigate("/dashboard", { replace: true });
+
+      const redirectTo = sessionStorage.getItem("redirectAfterLogin");
+      sessionStorage.removeItem("redirectAfterLogin");
+      navigate(redirectTo || "/dashboard", { replace: true });
     } catch (err) {
       setError(
         err.response?.data?.message ||
@@ -63,7 +70,7 @@ function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-950 px-4">
-      <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md text-center">
+      <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-xl w-full max-w-md text-center">
         <h1 className="text-3xl font-bold mb-2">Squad Habits</h1>
         <p className="text-gray-500 mb-6">Track habits together 🚀</p>
 

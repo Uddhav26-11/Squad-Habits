@@ -29,7 +29,22 @@ function Leaderboard({ data = [] }) {
                   alt={entry.name}
                   className="w-8 h-8 rounded-full"
                 />
-                <span className="font-medium text-slate-700 dark:text-slate-200">{entry.name}</span>
+                <div>
+                  <span className="font-medium text-slate-700 dark:text-slate-200 block">
+                    {entry.name}
+                  </span>
+                  {entry.role && (
+                    <span
+                      className={`text-[10px] font-semibold uppercase tracking-wide ${
+                        entry.role === "Admin"
+                          ? "text-indigo-500"
+                          : "text-slate-400 dark:text-slate-500"
+                      }`}
+                    >
+                      {entry.role}
+                    </span>
+                  )}
+                </div>
               </div>
 
               <div className="flex items-center gap-4 text-sm">

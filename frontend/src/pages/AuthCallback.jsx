@@ -15,7 +15,10 @@ function AuthCallback() {
         return;
       }
       await login(token);
-      navigate("/dashboard", { replace: true });
+
+      const redirectTo = sessionStorage.getItem("redirectAfterLogin");
+      sessionStorage.removeItem("redirectAfterLogin");
+      navigate(redirectTo || "/dashboard", { replace: true });
     };
     run();
     // eslint-disable-next-line react-hooks/exhaustive-deps

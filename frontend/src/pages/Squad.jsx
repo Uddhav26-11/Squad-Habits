@@ -1,15 +1,17 @@
 import { useEffect, useState, useCallback } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import api from "../services/api";
 import Navbar from "../components/Navbar";
 import HabitCard from "../components/HabitCard";
 import InviteLink from "../components/InviteLink";
 import Leaderboard from "../components/Leaderboard";
+import MembersList from "../components/MembersList";
 import { useAuth } from "../context/AuthContext";
 
 function Squad() {
   const { squadId } = useParams();
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   const [squad, setSquad] = useState(null);
   const [habits, setHabits] = useState([]);
@@ -43,6 +45,9 @@ function Squad() {
     loadAll();
   }, [loadAll]);
 
+  // Only admins can manage habits — members can only view + toggle.
+  const isAdmin = squad?.admin?._id === user?._id;
+
   const handleToggleHabit = async (habitId) => {
     setHabits((prev) =>
       prev.map((h) => (h._id === habitId ? { ...h, completedToday: !h.completedToday } : h))
@@ -58,12 +63,45 @@ function Squad() {
   const handleCreateHabit = async (e) => {
     e.preventDefault();
     if (!newHabitTitle.trim()) return;
+    if (!isAdmin) {
+      setError("Only the squad admin can add habits.");
+      return;
+    }
     try {
       await api.post("/habit/create", { squadId, title: newHabitTitle.trim() });
       setNewHabitTitle("");
       loadAll();
     } catch (err) {
-      setError("Failed to create habit. Are you the squad admin?");
+      setError(err.response?.data?.message || "Failed to create habit. Are you the squad admin?");
+    }
+  };
+
+  const handleEditHabit = async (habitId, title) => {
+    if (!isAdmin) {
+      setError("Only the squad admin can edit habits.");
+      return;
+    }
+    try {
+      await api.put(`/habit/${habitId}`, { title });
+      loadAll();
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to update habit.");
+    }
+  };
+
+  const handleDeleteHabit = async (habitId) => {
+    if (!isAdmin) {
+      setError("Only the squad admin can delete habits.");
+      return;
+    }
+    if (!window.confirm("Delete this habit? All progress logs for it will be removed too.")) {
+      return;
+    }
+    try {
+      await api.delete(`/habit/${habitId}`);
+      loadAll();
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to delete habit.");
     }
   };
 
@@ -77,6 +115,18 @@ function Squad() {
       }));
     } catch (err) {
       setError("Failed to regenerate invite link.");
+    }
+  };
+
+  const handleLeaveSquad = async () => {
+    if (!window.confirm("Leave this squad? You'll lose access to its habits and leaderboard.")) {
+      return;
+    }
+    try {
+      await api.post(`/squad/${squadId}/leave`);
+      navigate("/dashboard", { replace: true });
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to leave squad.");
     }
   };
 
@@ -99,8 +149,6 @@ function Squad() {
     );
   }
 
-  const isAdmin = squad.admin?._id === user?._id;
-
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
       <Navbar />
@@ -111,19 +159,63 @@ function Squad() {
             <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">{squad.name}</h1>
             <p className="text-slate-500 dark:text-slate-400 text-sm">
               {squad.memberCount} members • Admin: {squad.admin?.name}
+              {isAdmin && (
+                <span className="ml-2 text-[10px] font-semibold uppercase tracking-wide text-indigo-500 align-middle">
+                  You're the admin
+                </span>
+              )}
             </p>
           </div>
-          {analytics && (
-            <div className="text-right">
-              <p className="text-sm text-slate-500 dark:text-slate-400">Squad Health</p>
-              <p className="text-2xl font-bold text-blue-600">{analytics.squadAverage}/100</p>
-            </div>
-          )}
+          <div className="flex items-center gap-4">
+            {analytics && (
+              <div className="text-right">
+                <p className="text-sm text-slate-500 dark:text-slate-400">Squad Health</p>
+                <p className="text-2xl font-bold text-blue-600">{analytics.squadAverage}/100</p>
+              </div>
+            )}
+            {!isAdmin && (
+              <button
+                onClick={handleLeaveSquad}
+                className="text-sm bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-400 px-3 py-2 rounded-lg font-semibold transition"
+              >
+                Leave Squad
+              </button>
+            )}
+          </div>
         </div>
 
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg p-3 mb-6">
             {error}
+          </div>
+        )}
+
+        {analytics && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 text-center">
+              <p className="text-xl font-bold text-slate-800 dark:text-slate-100">
+                {analytics.totalMembers}
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Total Members</p>
+            </div>
+            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 text-center">
+              <p className="text-xl font-bold text-slate-800 dark:text-slate-100">
+                {analytics.activeMembersToday}
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Active Today</p>
+            </div>
+            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 text-center">
+              <p className="text-xl font-bold text-slate-800 dark:text-slate-100">
+                {analytics.topPerformer ? analytics.topPerformer.name : "-"}
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Top Performer</p>
+            </div>
+            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 text-center">
+              <p className="text-xl font-bold text-slate-800 dark:text-slate-100">
+                {analytics.atRiskMembers?.length ?? 0}
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">At Risk</p>
+            </div>
           </div>
         )}
 
@@ -139,11 +231,19 @@ function Squad() {
               ) : (
                 <div className="space-y-3">
                   {habits.map((habit) => (
-                    <HabitCard key={habit._id} habit={habit} onToggle={handleToggleHabit} />
+                    <HabitCard
+                      key={habit._id}
+                      habit={habit}
+                      onToggle={handleToggleHabit}
+                      isAdmin={isAdmin}
+                      onEdit={handleEditHabit}
+                      onDelete={handleDeleteHabit}
+                    />
                   ))}
                 </div>
               )}
 
+              {/* Only the squad admin can add habits — members can only view/toggle them. */}
               {isAdmin && (
                 <form onSubmit={handleCreateHabit} className="mt-4 flex gap-2">
                   <input
@@ -161,6 +261,8 @@ function Squad() {
                 </form>
               )}
             </div>
+
+            <MembersList members={leaderboard} />
 
             <Leaderboard data={leaderboard} />
           </div>
@@ -181,6 +283,25 @@ function Squad() {
                   {analytics.whoBrokeTheChain.name} missed {analytics.whoBrokeTheChain.missed} habit
                   {analytics.whoBrokeTheChain.missed === 1 ? "" : "s"} this week.
                 </p>
+              </div>
+            )}
+
+            {analytics?.atRiskMembers?.length > 0 && (
+              <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
+                <h4 className="font-semibold text-slate-800 dark:text-slate-100 mb-2">
+                  🚨 At Risk Members
+                </h4>
+                <ul className="space-y-1">
+                  {analytics.atRiskMembers.map((m) => (
+                    <li
+                      key={m.userId}
+                      className="text-sm text-slate-600 dark:text-slate-300 flex justify-between"
+                    >
+                      <span>{m.name}</span>
+                      <span className="text-red-500 font-semibold">{m.completionRate}%</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
           </div>

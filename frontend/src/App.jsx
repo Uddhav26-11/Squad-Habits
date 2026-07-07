@@ -8,6 +8,7 @@ import AuthCallback from "./pages/AuthCallback";
 import Dashboard from "./pages/Dashboard";
 import Squad from "./pages/Squad";
 import JoinSquad from "./pages/JoinSquad";
+import Leaderboard from "./components/Leaderboard";
 
 function App() {
   return (
@@ -44,12 +45,40 @@ function App() {
             }
           />
 
-          {/* Join Squad */}
+          {/* Join Squad (also aliased as /invite/:token to match invite links) */}
           <Route
             path="/join/:token"
             element={
               <ProtectedRoute>
                 <JoinSquad />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/invite/:token"
+            element={
+              <ProtectedRoute>
+                <JoinSquad />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Profile */}
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Leaderboard */}
+          <Route
+            path="/leaderboard"
+            element={
+              <ProtectedRoute>
+                <LeaderboardPage />
               </ProtectedRoute>
             }
           />

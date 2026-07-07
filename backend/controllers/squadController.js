@@ -143,6 +143,35 @@ exports.deleteSquad = async (req, res) => {
   }
 };
 
+exports.previewInvite = async (req, res) => {
+  try {
+    const squad = await Squad.findOne({ inviteToken: req.params.token }).populate(
+      "admin",
+      "name avatar"
+    );
+
+    if (!squad) {
+      return res.status(404).json({ message: "Invalid invite link" });
+    }
+
+    if (!squad.expiresAt || squad.expiresAt.getTime() < Date.now()) {
+      return res.status(410).json({ message: "This invite link has expired" });
+    }
+
+    const alreadyMember = squad.members.some((m) => m.toString() === req.user.id);
+
+    res.json({
+      squadId: squad._id,
+      squadName: squad.name,
+      adminName: squad.admin?.name,
+      memberCount: squad.members.length,
+      alreadyMember,
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to load invite", error: err.message });
+  }
+};
+
 exports.joinSquad = async (req, res) => {
   try {
     const squad = await Squad.findOne({ inviteToken: req.params.token });
@@ -185,5 +214,35 @@ exports.regenerateInvite = async (req, res) => {
     res.json({ inviteToken: squad.inviteToken, inviteExpiresAt: squad.expiresAt });
   } catch (err) {
     res.status(500).json({ message: "Failed to regenerate invite", error: err.message });
+  }
+};
+
+exports.leaveSquad = async (req, res) => {
+  try {
+    const squad = await Squad.findById(req.params.id);
+    if (!squad) return res.status(404).json({ message: "Squad not found" });
+
+    const isMember = squad.members.some((m) => m.toString() === req.user.id);
+    if (!isMember) {
+      return res.status(400).json({ message: "You are not a member of this squad" });
+    }
+
+    if (squad.admin.toString() === req.user.id) {
+      return res.status(400).json({
+        message: "Admin cannot leave the squad. Delete it or transfer admin rights instead.",
+      });
+    }
+
+    squad.members = squad.members.filter((m) => m.toString() !== req.user.id);
+    await squad.save();
+
+    await User.findByIdAndUpdate(req.user.id, { $pull: { squads: squad._id } });
+
+    const squadHabitIds = (await Habit.find({ squadId: squad._id })).map((h) => h._id);
+    await HabitLog.deleteMany({ userId: req.user.id, habitId: { $in: squadHabitIds } });
+
+    res.json({ message: "Left squad successfully" });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to leave squad", error: err.message });
   }
 };

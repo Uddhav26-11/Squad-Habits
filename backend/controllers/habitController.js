@@ -6,6 +6,7 @@ const {
   calculateStreak,
   calculateWeeklyCompletionRate,
   countMissedThisWeek,
+  getLastActiveDate,
   toDateKey,
 } = require("../utils/habitStats");
 
@@ -20,7 +21,7 @@ exports.createHabit = async (req, res) => {
     if (!squad) return res.status(404).json({ message: "Squad not found" });
 
     if (squad.admin.toString() !== req.user.id) {
-      return res.status(403).json({ message: "Only the squad admin can create habits" });
+      return res.status(403).json({ message: "Only squad admin can manage habits" });
     }
 
     const habit = await Habit.create({
@@ -32,6 +33,53 @@ exports.createHabit = async (req, res) => {
     res.status(201).json({ habit });
   } catch (err) {
     res.status(500).json({ message: "Failed to create habit", error: err.message });
+  }
+};
+
+exports.updateHabit = async (req, res) => {
+  try {
+    const { title } = req.body;
+    if (!title || !title.trim()) {
+      return res.status(400).json({ message: "Habit title is required" });
+    }
+
+    const habit = await Habit.findById(req.params.id);
+    if (!habit) return res.status(404).json({ message: "Habit not found" });
+
+    const squad = await Squad.findById(habit.squadId);
+    if (!squad) return res.status(404).json({ message: "Squad not found" });
+
+    if (squad.admin.toString() !== req.user.id) {
+      return res.status(403).json({ message: "Only squad admin can manage habits" });
+    }
+
+    habit.title = title.trim();
+    await habit.save();
+
+    res.json({ habit });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to update habit", error: err.message });
+  }
+};
+
+exports.deleteHabit = async (req, res) => {
+  try {
+    const habit = await Habit.findById(req.params.id);
+    if (!habit) return res.status(404).json({ message: "Habit not found" });
+
+    const squad = await Squad.findById(habit.squadId);
+    if (!squad) return res.status(404).json({ message: "Squad not found" });
+
+    if (squad.admin.toString() !== req.user.id) {
+      return res.status(403).json({ message: "Only squad admin can manage habits" });
+    }
+
+    await HabitLog.deleteMany({ habitId: habit._id });
+    await Habit.findByIdAndDelete(habit._id);
+
+    res.json({ message: "Habit deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to delete habit", error: err.message });
   }
 };
 
@@ -116,17 +164,33 @@ exports.getLeaderboard = async (req, res) => {
     const habitIds = habits.map((h) => h._id.toString());
     const logs = await HabitLog.find({ habitId: { $in: habits.map((h) => h._id) } });
 
+    const todayKey = toDateKey(new Date());
+
     const leaderboard = squad.members.map((member) => {
       const userLogs = logs.filter((log) => log.userId.toString() === member._id.toString());
       const streak = calculateStreak(userLogs, habitIds);
       const completionRate = calculateWeeklyCompletionRate(userLogs, habitIds);
 
+      const completedTodayCount = userLogs.filter(
+        (log) => log.completed && toDateKey(new Date(log.date)) === todayKey
+      ).length;
+      const todayStatus =
+        habitIds.length === 0
+          ? "No Habits"
+          : completedTodayCount >= habitIds.length
+          ? "Completed"
+          : completedTodayCount > 0
+          ? "In Progress"
+          : "Not Started";
+
       return {
         userId: member._id,
         name: member.name,
         avatar: member.avatar,
+        role: squad.admin.toString() === member._id.toString() ? "Admin" : "Member",
         streak,
         completionRate,
+        todayStatus,
         status: completionRate >= 70 ? "On Track" : completionRate >= 40 ? "Falling Behind" : "At Risk",
       };
     });
@@ -140,6 +204,49 @@ exports.getLeaderboard = async (req, res) => {
   }
 };
 
+exports.getMemberStats = async (req, res) => {
+  try {
+    const { squadId } = req.params;
+    const squad = await Squad.findById(squadId).populate("members", "name email avatar");
+    if (!squad) return res.status(404).json({ message: "Squad not found" });
+
+    const isMember = squad.members.some((m) => m._id.toString() === req.user.id);
+    if (!isMember) {
+      return res.status(403).json({ message: "You are not a member of this squad" });
+    }
+
+    const habits = await Habit.find({ squadId });
+    const habitIds = habits.map((h) => h._id.toString());
+    const logs = await HabitLog.find({ habitId: { $in: habits.map((h) => h._id) } });
+
+    const members = squad.members.map((member) => {
+      const userLogs = logs.filter((log) => log.userId.toString() === member._id.toString());
+      const streak = calculateStreak(userLogs, habitIds);
+      const completionRate = calculateWeeklyCompletionRate(userLogs, habitIds);
+      const missedDays = countMissedThisWeek(userLogs, habitIds);
+      const lastActive = getLastActiveDate(userLogs);
+
+      return {
+        userId: member._id,
+        name: member.name,
+        avatar: member.avatar,
+        role: squad.admin.toString() === member._id.toString() ? "Admin" : "Member",
+        streak,
+        completionRate,
+        missedDays,
+        lastActive,
+        atRisk: completionRate < 40,
+      };
+    });
+
+    members.sort((a, b) => b.streak - a.streak || b.completionRate - a.completionRate);
+
+    res.json({ members });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch member stats", error: err.message });
+  }
+};
+
 exports.getSquadAnalytics = async (req, res) => {
   try {
     const { squadId } = req.params;
@@ -150,27 +257,64 @@ exports.getSquadAnalytics = async (req, res) => {
     const habitIds = habits.map((h) => h._id.toString());
     const logs = await HabitLog.find({ habitId: { $in: habits.map((h) => h._id) } });
 
+    const todayKey = toDateKey(new Date());
+
     let worstMember = null;
     let worstMissed = -1;
+    let bestMember = null;
+    let bestScore = -1;
     let totalRate = 0;
+    let activeMembersToday = 0;
+    const atRiskMembers = [];
 
     squad.members.forEach((member) => {
       const userLogs = logs.filter((log) => log.userId.toString() === member._id.toString());
       const missed = countMissedThisWeek(userLogs, habitIds);
       const rate = calculateWeeklyCompletionRate(userLogs, habitIds);
+      const streak = calculateStreak(userLogs, habitIds);
       totalRate += rate;
+
+      const completedToday = userLogs.some(
+        (log) => log.completed && toDateKey(new Date(log.date)) === todayKey
+      );
+      if (completedToday) activeMembersToday += 1;
 
       if (missed > worstMissed) {
         worstMissed = missed;
         worstMember = { userId: member._id, name: member.name, avatar: member.avatar, missed };
+      }
+
+      const score = streak * 100 + rate;
+      if (score > bestScore) {
+        bestScore = score;
+        bestMember = {
+          userId: member._id,
+          name: member.name,
+          avatar: member.avatar,
+          streak,
+          completionRate: rate,
+        };
+      }
+
+      if (rate < 40 || !completedToday) {
+        atRiskMembers.push({
+          userId: member._id,
+          name: member.name,
+          avatar: member.avatar,
+          completionRate: rate,
+        });
       }
     });
 
     const squadAverage = squad.members.length > 0 ? Math.round(totalRate / squad.members.length) : 0;
 
     res.json({
+      totalMembers: squad.members.length,
+      activeMembersToday,
       squadAverage,
       whoBrokeTheChain: worstMissed > 0 ? worstMember : null,
+      topPerformer: squad.members.length > 0 ? bestMember : null,
+      atRiskMembers,
     });
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch analytics", error: err.message });
@@ -212,7 +356,6 @@ exports.getDashboardStats = async (req, res) => {
       ).length;
       todayTotal += habits.length;
 
-      // Rank within this squad
       const allLogs = await HabitLog.find({ habitId: { $in: habits.map((h) => h._id) } });
       const squadDoc = await Squad.findById(squad._id).select("members");
       const ranked = squadDoc.members
