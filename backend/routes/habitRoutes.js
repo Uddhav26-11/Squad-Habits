@@ -1,84 +1,23 @@
 const router = require("express").Router();
+const auth = require("../middleware/authMiddleware");
+const habitController = require("../controllers/habitController");
 
-const Habit = require("../models/Habit");
-const HabitLog = require("../models/HabitLog");
+// Create a habit (squad admin only)
+router.post("/create", auth, habitController.createHabit);
 
+// Get all habits for a squad, with today's completion status for current user
+router.get("/squad/:squadId", auth, habitController.getHabitsForSquad);
 
-// Add Habit
-router.post("/add", async (req, res) => {
-  try {
-    const habit = await Habit.create({
-      title: req.body.title,
-      squadId: req.body.squadId,
-      createdBy: req.body.userId
-    });
+// Toggle today's completion status for a habit
+router.post("/complete", auth, habitController.toggleComplete);
 
-    res.json(habit);
+// Leaderboard for a squad
+router.get("/leaderboard/:squadId", auth, habitController.getLeaderboard);
 
-  } catch (error) {
-    res.status(500).json({
-      message: error.message
-    });
-  }
-});
+// Squad analytics (squad average score, who broke the chain)
+router.get("/analytics/:squadId", auth, habitController.getSquadAnalytics);
 
-
-// Complete Habit
-router.post("/complete", async (req, res) => {
-  try {
-
-    const log = await HabitLog.create({
-      habitId: req.body.habitId,
-      userId: req.body.userId,
-      date: new Date(),
-      completed: true
-    });
-
-    res.json(log);
-
-  } catch (error) {
-    res.status(500).json({
-      message: error.message
-    });
-  }
-});
-
-
-// Dashboard Stats
-router.get("/dashboard", async (req, res) => {
-  try {
-
-    const totalHabits = await Habit.countDocuments();
-
-    const completedHabits = await HabitLog.countDocuments({
-      completed: true
-    });
-
-
-    const completionPercentage =
-      totalHabits > 0
-        ? Math.round((completedHabits / totalHabits) * 100)
-        : 0;
-
-
-    res.json({
-      totalSquads: 0,
-      activeHabits: totalHabits,
-      currentStreak: 0,
-      completionPercentage,
-      squadRanking: null,
-      todayProgress: completionPercentage
-    });
-
-
-  } catch (error) {
-
-    res.status(500).json({
-      message: error.message
-    });
-
-  }
-});
-
+// Logged-in user's dashboard stats
+router.get("/dashboard", auth, habitController.getDashboardStats);
 
 module.exports = router;

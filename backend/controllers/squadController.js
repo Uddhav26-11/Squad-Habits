@@ -1,16 +1,36 @@
 const Squad = require("../models/Squad");
 const User = require("../models/User");
+const Habit = require("../models/Habit");
+const HabitLog = require("../models/HabitLog");
 const { generateInviteToken, getExpiryDate } = require("../utils/generateInviteToken");
+
+// Only letters and single spaces between words. No numbers/special chars.
+const SQUAD_NAME_REGEX = /^[A-Za-z]+(?:\s[A-Za-z]+)*$/;
+
+function normalizeSquadName(name) {
+  return name.trim().replace(/\s+/g, " ");
+}
+
+function isValidSquadName(name) {
+  return SQUAD_NAME_REGEX.test(normalizeSquadName(name));
+}
 
 exports.createSquad = async (req, res) => {
   try {
     const { name } = req.body;
+
     if (!name || !name.trim()) {
       return res.status(400).json({ message: "Squad name is required" });
     }
 
+    if (!isValidSquadName(name)) {
+      return res.status(400).json({
+        message: "Squad name can only contain letters and spaces (no numbers or special characters)",
+      });
+    }
+
     const squad = await Squad.create({
-      name: name.trim(),
+      name: normalizeSquadName(name),
       admin: req.user.id,
       members: [req.user.id],
       inviteToken: generateInviteToken(),
@@ -67,6 +87,59 @@ exports.getSquadDetails = async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch squad", error: err.message });
+  }
+};
+
+exports.updateSquad = async (req, res) => {
+  try {
+    const { name } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ message: "Squad name is required" });
+    }
+
+    if (!isValidSquadName(name)) {
+      return res.status(400).json({
+        message: "Squad name can only contain letters and spaces (no numbers or special characters)",
+      });
+    }
+
+    const squad = await Squad.findById(req.params.id);
+    if (!squad) return res.status(404).json({ message: "Squad not found" });
+
+    if (squad.admin.toString() !== req.user.id) {
+      return res.status(403).json({ message: "Only the squad admin can edit this squad" });
+    }
+
+    squad.name = normalizeSquadName(name);
+    await squad.save();
+
+    res.json({ squad });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to update squad", error: err.message });
+  }
+};
+
+exports.deleteSquad = async (req, res) => {
+  try {
+    const squad = await Squad.findById(req.params.id);
+    if (!squad) return res.status(404).json({ message: "Squad not found" });
+
+    if (squad.admin.toString() !== req.user.id) {
+      return res.status(403).json({ message: "Only the squad admin can delete this squad" });
+    }
+
+    const habits = await Habit.find({ squadId: squad._id });
+    const habitIds = habits.map((h) => h._id);
+
+    await HabitLog.deleteMany({ habitId: { $in: habitIds } });
+    await Habit.deleteMany({ squadId: squad._id });
+    await User.updateMany({ squads: squad._id }, { $pull: { squads: squad._id } });
+    await Squad.findByIdAndDelete(squad._id);
+
+    res.json({ message: "Squad deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to delete squad", error: err.message });
   }
 };
 

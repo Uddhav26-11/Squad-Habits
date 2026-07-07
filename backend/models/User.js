@@ -6,6 +6,11 @@ const userSchema = new mongoose.Schema({
   email: {
     type: String,
     unique: true,
+    sparse: true,
+  },
+
+  password: {
+    type: String, // hashed with bcrypt, only set for email/password accounts
   },
 
   googleId: String,
