@@ -14,15 +14,13 @@ function Login() {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
+  const apiUrl = import.meta.env.VITE_API_URL || "";
 
   const handleGoogleLogin = () => {
     // ProtectedRoute already stashed the intended destination (if any) in
     // sessionStorage before redirecting here — AuthCallback will read it
     // once Google sends the user back.
-    window.location.href =
-      "https://2gbrq124-5000.inc1.devtunnels.ms/auth/google";
-
+    window.location.href = `${apiUrl}/auth/google`;
   };
 
   const handleSubmit = async (e) => {
