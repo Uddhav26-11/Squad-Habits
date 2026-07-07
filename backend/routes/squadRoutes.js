@@ -1,81 +1,11 @@
-const router=require("express").Router();
+const router = require("express").Router();
+const auth = require("../middleware/authMiddleware");
+const squadController = require("../controllers/squadController");
 
-const Squad=require("../models/Squad");
+router.post("/create", auth, squadController.createSquad);
+router.get("/my", auth, squadController.getMySquads);
+router.get("/:id", auth, squadController.getSquadDetails);
+router.post("/join/:token", auth, squadController.joinSquad);
+router.post("/:id/invite/regenerate", auth, squadController.regenerateInvite);
 
-const {v4:uuid}=require("uuid");
-
-router.post(
-
-"/create",
-
-async(req,res)=>{
-
-const inviteToken=uuid();
-
-const squad=await Squad.create({
-
-name:req.body.name,
-
-admin:req.body.userId,
-
-members:[req.body.userId],
-
-inviteToken,
-
-expiresAt:
-
-Date.now()+86400000
-
-});
-
-res.json(squad);
-
-}
-
-);
-
-router.post(
-
-"/join/:token",
-
-async(req,res)=>{
-
-const squad=
-
-await Squad.findOne({
-
-inviteToken:req.params.token
-
-});
-
-if(!squad){
-
-return res.status(404)
-
-.json({
-
-message:"Invalid Link"
-
-});
-
-}
-
-squad.members.push(
-
-req.body.userId
-
-);
-
-await squad.save();
-
-res.json({
-
-message:"Joined"
-
-});
-
-}
-
-);
-
-module.exports=router;
+module.exports = router;

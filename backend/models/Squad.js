@@ -1,37 +1,27 @@
-const mongoose=require("mongoose");
+const mongoose = require("mongoose");
 
-const squadSchema=new mongoose.Schema({
+const squadSchema = new mongoose.Schema(
+  {
+    name: String,
 
-name:String,
+    admin: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
 
-admin:{
-type:mongoose.Schema.Types.ObjectId,
-ref:"User"
-},
+    members: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
 
-members:[{
-
-type:mongoose.Schema.Types.ObjectId,
-
-ref:"User"
-
-}],
-
-inviteToken:String,
-
-expiresAt:Date
-
-},
-{
-timestamps:true
-}
-
+    inviteToken: String,
+    expiresAt: Date,
+  },
+  {
+    timestamps: true,
+  }
 );
 
-module.exports=mongoose.model(
-
-"Squad",
-
-squadSchema
-
-);
+module.exports = mongoose.model("Squad", squadSchema);

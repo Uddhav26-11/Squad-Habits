@@ -1,39 +1,24 @@
-const mongoose=require("mongoose");
+const mongoose = require("mongoose");
 
-const habitLogSchema=new mongoose.Schema({
+const habitLogSchema = new mongoose.Schema({
+  habitId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Habit",
+  },
 
-habitId:{
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+  },
 
-type:mongoose.Schema.Types.ObjectId,
+  date: Date,
 
-ref:"Habit"
-
-},
-
-userId:{
-
-type:mongoose.Schema.Types.ObjectId,
-
-ref:"User"
-
-},
-
-date:Date,
-
-completed:{
-
-type:Boolean,
-
-default:false
-
-}
-
+  completed: {
+    type: Boolean,
+    default: false,
+  },
 });
 
-module.exports=mongoose.model(
+habitLogSchema.index({ habitId: 1, userId: 1, date: 1 });
 
-"HabitLog",
-
-habitLogSchema
-
-);
+module.exports = mongoose.model("HabitLog", habitLogSchema);

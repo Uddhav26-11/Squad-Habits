@@ -8,38 +8,26 @@ passport.use(
     {
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-     callbackURL: "https://2gbrq124-5000.inc1.devtunnels.ms/auth/google/callback"
+      callbackURL:
+        process.env.GOOGLE_CALLBACK_URL ||
+        "https://2gbrq124-5000.inc1.devtunnels.ms/auth/google/callback",
     },
-
     async (accessToken, refreshToken, profile, done) => {
       try {
-
-        let user = await User.findOne({
-          googleId: profile.id
-        });
+        let user = await User.findOne({ googleId: profile.id });
 
         if (!user) {
-
           user = await User.create({
-
             googleId: profile.id,
-
             name: profile.displayName,
-
-            email: profile.emails[0].value,
-
-            avatar: profile.photos[0].value
-
+            email: profile.emails && profile.emails[0] ? profile.emails[0].value : "",
+            avatar: profile.photos && profile.photos[0] ? profile.photos[0].value : "",
           });
-
         }
 
         done(null, user);
-
       } catch (err) {
-
         done(err, null);
-
       }
     }
   )

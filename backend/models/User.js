@@ -1,26 +1,23 @@
 const mongoose = require("mongoose");
 
 const userSchema = new mongoose.Schema({
+  name: String,
 
-name:String,
+  email: {
+    type: String,
+    unique: true,
+  },
 
-email:{
-type:String,
-unique:true
-},
+  googleId: String,
 
-googleId:String,
+  avatar: String,
 
-avatar:String,
-
-squads:[{
-type:mongoose.Schema.Types.ObjectId,
-ref:"Squad"
-}]
-
+  squads: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Squad",
+    },
+  ],
 });
 
-module.exports=mongoose.model(
-"User",
-userSchema
-);
+module.exports = mongoose.model("User", userSchema);

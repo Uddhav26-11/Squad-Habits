@@ -1,67 +1,21 @@
-const router=require("express").Router();
+const router = require("express").Router();
+const passport = require("passport");
 
-const passport=require("passport");
+const authController = require("../controllers/authController");
+const authMiddleware = require("../middleware/authMiddleware");
 
-const jwt=require("jsonwebtoken");
-
-router.get(
-
-"/google",
-
-passport.authenticate(
-
-"google",
-
-{
-
-scope:["profile","email"]
-
-}
-
-)
-
-);
+router.get("/google", passport.authenticate("google", { scope: ["profile", "email"] }));
 
 router.get(
-
-"/google/callback",
-
-passport.authenticate(
-
-"google",
-
-{
-
-session:false
-
-}
-
-),
-
-(req,res)=>{
-
-const token=jwt.sign(
-
-{
-
-id:req.user._id
-
-},
-
-process.env.JWT_SECRET
-
+  "/google/callback",
+  passport.authenticate("google", {
+    session: false,
+    failureRedirect: `${process.env.FRONTEND_URL || "http://localhost:5173"}/login`,
+  }),
+  authController.googleCallback
 );
 
-res.json({
+router.get("/me", authMiddleware, authController.getMe);
+router.post("/logout", authMiddleware, authController.logout);
 
-token,
-
-user:req.user
-
-});
-
-}
-
-);
-
-module.exports=router;
+module.exports = router;
