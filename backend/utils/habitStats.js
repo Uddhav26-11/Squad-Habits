@@ -1,5 +1,24 @@
+// All "today"/date-boundary logic below is UTC-based to stay consistent
+// with toDateKey(), which formats dates using date.toISOString(). Mixing
+// local-time cursors with UTC-keyed logs caused streak/completion drift
+// for users outside UTC (e.g. IST, UTC+5:30), which was corrupting the
+// leaderboard ranking.
+
 function toDateKey(date) {
   return date.toISOString().slice(0, 10); // YYYY-MM-DD (UTC)
+}
+
+// Returns a Date set to UTC midnight of "today".
+function utcToday() {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+}
+
+// Moves a UTC-midnight cursor back by `days` days (UTC-safe, no DST issues).
+function shiftUtcDate(date, days) {
+  const shifted = new Date(date);
+  shifted.setUTCDate(shifted.getUTCDate() + days);
+  return shifted;
 }
 
 function buildCompletionMap(logs) {
@@ -24,17 +43,16 @@ function calculateStreak(logs, habitIds) {
   if (habitIds.length === 0) return 0;
   const map = buildCompletionMap(logs);
 
-  const cursor = new Date();
-  cursor.setHours(0, 0, 0, 0);
+  let cursor = utcToday();
 
   if (!isDayComplete(map, habitIds, cursor)) {
-    cursor.setDate(cursor.getDate() - 1);
+    cursor = shiftUtcDate(cursor, -1);
   }
 
   let streak = 0;
   while (isDayComplete(map, habitIds, cursor)) {
     streak++;
-    cursor.setDate(cursor.getDate() - 1);
+    cursor = shiftUtcDate(cursor, -1);
   }
 
   return streak;
@@ -47,8 +65,7 @@ function calculateWeeklyCompletionRate(logs, habitIds, days = 7) {
   let completedCount = 0;
   const totalPossible = habitIds.length * days;
 
-  const cursor = new Date();
-  cursor.setHours(0, 0, 0, 0);
+  let cursor = utcToday();
 
   for (let i = 0; i < days; i++) {
     const set = map[toDateKey(cursor)];
@@ -57,7 +74,7 @@ function calculateWeeklyCompletionRate(logs, habitIds, days = 7) {
         if (set.has(id)) completedCount++;
       });
     }
-    cursor.setDate(cursor.getDate() - 1);
+    cursor = shiftUtcDate(cursor, -1);
   }
 
   if (totalPossible === 0) return 0;
@@ -68,15 +85,14 @@ function countMissedThisWeek(logs, habitIds, days = 7) {
   const map = buildCompletionMap(logs);
   let missed = 0;
 
-  const cursor = new Date();
-  cursor.setHours(0, 0, 0, 0);
+  let cursor = utcToday();
 
   for (let i = 0; i < days; i++) {
     const set = map[toDateKey(cursor)] || new Set();
     habitIds.forEach((id) => {
       if (!set.has(id)) missed++;
     });
-    cursor.setDate(cursor.getDate() - 1);
+    cursor = shiftUtcDate(cursor, -1);
   }
 
   return missed;
@@ -95,6 +111,8 @@ function getLastActiveDate(logs) {
 
 module.exports = {
   toDateKey,
+  utcToday,
+  shiftUtcDate,
   calculateStreak,
   calculateWeeklyCompletionRate,
   countMissedThisWeek,
