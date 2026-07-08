@@ -1,10 +1,11 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../services/api";
 import { useAuth } from "../context/AuthContext";
 
 function Login() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { login } = useAuth();
 
   const [mode, setMode] = useState("login"); // "login" | "register"
@@ -16,11 +17,26 @@ function Login() {
 
   const apiUrl = import.meta.env.VITE_API_URL || "";
 
+  // If the backend redirected us back here after a failed Google login
+  // (?error=google_auth_failed), show it instead of failing silently.
+  useEffect(() => {
+    const oauthError = searchParams.get("error");
+    if (oauthError === "google_auth_failed") {
+      console.error("[Login] Google OAuth failed — backend redirected with error flag");
+      setError("Google sign-in failed. Please try again or use email/password.");
+    }
+  }, [searchParams]);
+
   const handleGoogleLogin = () => {
-    // ProtectedRoute already stashed the intended destination (if any) in
-    // sessionStorage before redirecting here — AuthCallback will read it
-    // once Google sends the user back.
-    window.location.href = `${apiUrl}/auth/google`;
+    console.log("[Login] 'Continue with Google' clicked");
+
+    // Clear any stale session state before starting a new Google login, so
+    // a previous account's token can never leak into the new login.
+    sessionStorage.removeItem("token");
+
+    const target = `${apiUrl}/api/auth/google`;
+    console.log(`[Login] Redirecting to: ${target}`);
+    window.location.href = target;
   };
 
   const handleSubmit = async (e) => {
@@ -50,6 +66,7 @@ function Login() {
           ? { name: name.trim(), email: email.trim(), password }
           : { email: email.trim(), password };
 
+      console.log(`[Login] Submitting ${mode} request for ${email.trim()}`);
       const res = await api.post(endpoint, payload);
       await login(res.data.token);
 
@@ -57,6 +74,7 @@ function Login() {
       sessionStorage.removeItem("redirectAfterLogin");
       navigate(redirectTo || "/dashboard", { replace: true });
     } catch (err) {
+      console.error(`[Login] ${mode} failed:`, err.response?.data || err.message);
       setError(
         err.response?.data?.message ||
           (mode === "register" ? "Registration failed." : "Login failed.")

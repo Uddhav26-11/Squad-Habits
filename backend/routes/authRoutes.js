@@ -4,13 +4,26 @@ const passport = require("passport");
 const authController = require("../controllers/authController");
 const authMiddleware = require("../middleware/authMiddleware");
 
-router.get("/google", passport.authenticate("google", { scope: ["profile", "email"] }));
+const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+
+router.get(
+  "/google",
+  (req, res, next) => {
+    console.log("[authRoutes] /google hit — redirecting to Google OAuth consent screen");
+    next();
+  },
+  passport.authenticate("google", { scope: ["profile", "email"], session: false })
+);
 
 router.get(
   "/google/callback",
+  (req, res, next) => {
+    console.log("[authRoutes] /google/callback hit, query:", req.query);
+    next();
+  },
   passport.authenticate("google", {
     session: false,
-    failureRedirect: `${process.env.FRONTEND_URL || "http://localhost:5173"}/login`,
+    failureRedirect: `${frontendUrl}/login?error=google_auth_failed`,
   }),
   authController.googleCallback
 );

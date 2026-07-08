@@ -11,9 +11,12 @@ function AuthCallback() {
     const run = async () => {
       const token = searchParams.get("token");
       if (!token) {
-        navigate("/login", { replace: true });
+        console.error("[AuthCallback] No token in URL — Google auth likely failed upstream");
+        navigate("/login?error=google_auth_failed", { replace: true });
         return;
       }
+
+      console.log("[AuthCallback] Token received, logging in...");
       await login(token);
 
       const redirectTo = sessionStorage.getItem("redirectAfterLogin");

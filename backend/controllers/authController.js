@@ -11,9 +11,16 @@ function signToken(userId) {
 }
 
 exports.googleCallback = (req, res) => {
+  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+
+  if (!req.user) {
+    console.error("[authController.googleCallback] No req.user after Google auth — this shouldn't happen if passport succeeded");
+    return res.redirect(`${frontendUrl}/login?error=google_auth_failed`);
+  }
+
+  console.log(`[authController.googleCallback] Issuing token for user ${req.user._id} (${req.user.email})`);
   const token = signToken(req.user._id);
 
-  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
   res.redirect(`${frontendUrl}/auth/callback?token=${token}`);
 };
 
