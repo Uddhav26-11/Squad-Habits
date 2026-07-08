@@ -1,93 +1,137 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 import { AuthProvider } from "./context/AuthContext";
+import { SquadProvider } from "./context/SquadContext";
+import { ToastProvider } from "./context/ToastContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 import Login from "./pages/Login";
 import AuthCallback from "./pages/AuthCallback";
 import Dashboard from "./pages/Dashboard";
 import Squad from "./pages/Squad";
+import SquadLeaderboard from "./pages/SquadLeaderboard";
+import SquadMembers from "./pages/SquadMembers";
+import AddHabit from "./pages/AddHabit";
+import MyHabits from "./pages/MyHabits";
 import JoinSquad from "./pages/JoinSquad";
-import Leaderboard from "./components/Leaderboard";
 import Profile from "./pages/Profile";
+
+// Wraps every authenticated route with SquadProvider so the sidebar always
+// knows which squads the user belongs to and which one is "active".
+function WithSquads({ children }) {
+  return <SquadProvider>{children}</SquadProvider>;
+}
 
 function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Routes>
+        <ToastProvider>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
 
-          {/* Login */}
-          <Route path="/login" element={<Login />} />
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <WithSquads>
+                    <Dashboard />
+                  </WithSquads>
+                </ProtectedRoute>
+              }
+            />
 
-          {/* Google OAuth Callback */}
-          <Route
-            path="/auth/callback"
-            element={<AuthCallback />}
-          />
+            <Route
+              path="/squad/:squadId"
+              element={
+                <ProtectedRoute>
+                  <WithSquads>
+                    <Squad />
+                  </WithSquads>
+                </ProtectedRoute>
+              }
+            />
 
-          {/* Protected Dashboard */}
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          />
+            <Route
+              path="/squad/:squadId/leaderboard"
+              element={
+                <ProtectedRoute>
+                  <WithSquads>
+                    <SquadLeaderboard />
+                  </WithSquads>
+                </ProtectedRoute>
+              }
+            />
 
-          {/* Squad Details */}
-          <Route
-            path="/squad/:squadId"
-            element={
-              <ProtectedRoute>
-                <Squad />
-              </ProtectedRoute>
-            }
-          />
+            <Route
+              path="/squad/:squadId/members"
+              element={
+                <ProtectedRoute>
+                  <WithSquads>
+                    <SquadMembers />
+                  </WithSquads>
+                </ProtectedRoute>
+              }
+            />
 
-          {/* Join Squad (also aliased as /invite/:token to match invite links) */}
-          <Route
-            path="/join/:token"
-            element={
-              <ProtectedRoute>
-                <JoinSquad />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/invite/:token"
-            element={
-              <ProtectedRoute>
-                <JoinSquad />
-              </ProtectedRoute>
-            }
-          />
+            <Route
+              path="/squad/:squadId/add-habit"
+              element={
+                <ProtectedRoute>
+                  <WithSquads>
+                    <AddHabit />
+                  </WithSquads>
+                </ProtectedRoute>
+              }
+            />
 
-          {/* Profile */}
-          <Route
-            path="/profile"
-            element={
-              <ProtectedRoute>
-                <Profile />
-              </ProtectedRoute>
-            }
-          />
+            <Route
+              path="/my-habits"
+              element={
+                <ProtectedRoute>
+                  <WithSquads>
+                    <MyHabits />
+                  </WithSquads>
+                </ProtectedRoute>
+              }
+            />
 
-          {/* Leaderboard */}
-          <Route
-            path="/leaderboard"
-            element={
-              <ProtectedRoute>
-                <Leaderboard />
-              </ProtectedRoute>
-            }
-          />
+            <Route
+              path="/join/:token"
+              element={
+                <ProtectedRoute>
+                  <WithSquads>
+                    <JoinSquad />
+                  </WithSquads>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/invite/:token"
+              element={
+                <ProtectedRoute>
+                  <WithSquads>
+                    <JoinSquad />
+                  </WithSquads>
+                </ProtectedRoute>
+              }
+            />
 
-          {/* Default Route */}
-          <Route path="*" element={<Login />} />
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute>
+                  <WithSquads>
+                    <Profile />
+                  </WithSquads>
+                </ProtectedRoute>
+              }
+            />
 
-        </Routes>
+            <Route path="*" element={<Login />} />
+          </Routes>
+        </ToastProvider>
       </AuthProvider>
     </BrowserRouter>
   );

@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../services/api";
-import Navbar from "../components/Navbar";
+import Layout from "../components/Layout";
 import { useAuth } from "../context/AuthContext";
+import { useSquads } from "../context/SquadContext";
 
 const SQUAD_NAME_REGEX = /^[A-Za-z]+(?:\s[A-Za-z]+)*$/;
 
@@ -29,6 +30,7 @@ function StatCard({ label, value, icon }) {
 
 function Dashboard() {
   const { user } = useAuth();
+  const { refreshSquads, setActiveSquadId } = useSquads();
   const [stats, setStats] = useState(null);
   const [squads, setSquads] = useState([]);
   const [newSquadName, setNewSquadName] = useState("");
@@ -37,13 +39,11 @@ function Dashboard() {
   const [error, setError] = useState("");
   const [formError, setFormError] = useState("");
 
-  // Edit modal state
   const [editingSquad, setEditingSquad] = useState(null);
   const [editName, setEditName] = useState("");
   const [editError, setEditError] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
 
-  // Delete confirmation state
   const [deletingSquad, setDeletingSquad] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -85,12 +85,12 @@ function Dashboard() {
         name: newSquadName.trim().replace(/\s+/g, " "),
       });
       setNewSquadName("");
-      // Update squad list + count instantly without needing a full page refresh
       setSquads((prev) => [...prev, res.data.squad]);
       setStats((prev) =>
         prev ? { ...prev, totalSquads: (prev.totalSquads || 0) + 1 } : prev
       );
       loadData();
+      refreshSquads();
     } catch (err) {
       setFormError(err.response?.data?.message || "Failed to create squad.");
     } finally {
@@ -156,6 +156,7 @@ function Dashboard() {
       );
       closeDeleteConfirm();
       loadData();
+      refreshSquads();
     } catch (err) {
       setError(err.response?.data?.message || "Failed to delete squad.");
       closeDeleteConfirm();
@@ -166,16 +167,16 @@ function Dashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
-        <p className="text-slate-500 dark:text-slate-400 animate-pulse">Loading dashboard...</p>
-      </div>
+      <Layout>
+        <div className="min-h-[60vh] flex items-center justify-center">
+          <p className="text-slate-500 dark:text-slate-400 animate-pulse">Loading dashboard...</p>
+        </div>
+      </Layout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      <Navbar />
-
+    <Layout>
       <div className="max-w-6xl mx-auto px-6 py-8">
         <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-1">
           Welcome back, {user?.name?.split(" ")[0] || "there"} 👋
@@ -274,7 +275,6 @@ function Dashboard() {
         </div>
       </div>
 
-      {/* Edit Squad Modal */}
       {editingSquad && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
           <div className="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-sm">
@@ -312,7 +312,6 @@ function Dashboard() {
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
       {deletingSquad && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
           <div className="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-sm text-center">
@@ -340,7 +339,7 @@ function Dashboard() {
           </div>
         </div>
       )}
-    </div>
+    </Layout>
   );
 }
 

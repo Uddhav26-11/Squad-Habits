@@ -1,38 +1,69 @@
 import { useEffect, useState, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, NavLink } from "react-router-dom";
 import api from "../services/api";
-import Navbar from "../components/Navbar";
+import Layout from "../components/Layout";
 import HabitCard from "../components/HabitCard";
 import InviteLink from "../components/InviteLink";
-import Leaderboard from "../components/Leaderboard";
-import MembersList from "../components/MembersList";
 import { useAuth } from "../context/AuthContext";
+import { useSquads } from "../context/SquadContext";
+
+// Small sub-nav shown at the top of every squad-scoped page (Overview,
+// Leaderboard, Members, Add Habit).
+export function SquadTabs({ squadId, squadName, isAdmin }) {
+  const tabClass = ({ isActive }) =>
+    `px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+      isActive
+        ? "bg-blue-600 text-white"
+        : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+    }`;
+
+  return (
+    <div className="mb-6">
+      {squadName && (
+        <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-3">{squadName}</h1>
+      )}
+      <div className="flex flex-wrap gap-2">
+        <NavLink to={`/squad/${squadId}`} end className={tabClass}>
+          Overview
+        </NavLink>
+        <NavLink to={`/squad/${squadId}/leaderboard`} className={tabClass}>
+          Leaderboard
+        </NavLink>
+        <NavLink to={`/squad/${squadId}/members`} className={tabClass}>
+          Members
+        </NavLink>
+        {isAdmin && (
+          <NavLink to={`/squad/${squadId}/add-habit`} className={tabClass}>
+            Add Habit
+          </NavLink>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function Squad() {
   const { squadId } = useParams();
   const { user } = useAuth();
+  const { refreshSquads } = useSquads();
   const navigate = useNavigate();
 
   const [squad, setSquad] = useState(null);
   const [habits, setHabits] = useState([]);
-  const [leaderboard, setLeaderboard] = useState([]);
   const [analytics, setAnalytics] = useState(null);
-  const [newHabitTitle, setNewHabitTitle] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const loadAll = useCallback(async () => {
     setError("");
     try {
-      const [squadRes, habitsRes, leaderboardRes, analyticsRes] = await Promise.all([
+      const [squadRes, habitsRes, analyticsRes] = await Promise.all([
         api.get(`/squad/${squadId}`),
         api.get(`/habit/squad/${squadId}`),
-        api.get(`/habit/leaderboard/${squadId}`),
         api.get(`/habit/analytics/${squadId}`),
       ]);
       setSquad(squadRes.data.squad);
       setHabits(habitsRes.data.habits);
-      setLeaderboard(leaderboardRes.data.leaderboard);
       setAnalytics(analyticsRes.data);
     } catch (err) {
       setError("Failed to load squad data.");
@@ -45,7 +76,6 @@ function Squad() {
     loadAll();
   }, [loadAll]);
 
-  // Only admins can manage habits — members can only view + toggle.
   const isAdmin = squad?.admin?._id === user?._id;
 
   const handleToggleHabit = async (habitId) => {
@@ -57,22 +87,6 @@ function Squad() {
       loadAll();
     } catch (err) {
       loadAll();
-    }
-  };
-
-  const handleCreateHabit = async (e) => {
-    e.preventDefault();
-    if (!newHabitTitle.trim()) return;
-    if (!isAdmin) {
-      setError("Only the squad admin can add habits.");
-      return;
-    }
-    try {
-      await api.post("/habit/create", { squadId, title: newHabitTitle.trim() });
-      setNewHabitTitle("");
-      loadAll();
-    } catch (err) {
-      setError(err.response?.data?.message || "Failed to create habit. Are you the squad admin?");
     }
   };
 
@@ -124,6 +138,7 @@ function Squad() {
     }
     try {
       await api.post(`/squad/${squadId}/leave`);
+      refreshSquads();
       navigate("/dashboard", { replace: true });
     } catch (err) {
       setError(err.response?.data?.message || "Failed to leave squad.");
@@ -132,40 +147,38 @@ function Squad() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
-        <p className="text-slate-500 dark:text-slate-400 animate-pulse">Loading squad...</p>
-      </div>
+      <Layout>
+        <div className="min-h-[60vh] flex items-center justify-center">
+          <p className="text-slate-500 dark:text-slate-400 animate-pulse">Loading squad...</p>
+        </div>
+      </Layout>
     );
   }
 
   if (!squad) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-        <Navbar />
+      <Layout>
         <div className="max-w-4xl mx-auto px-6 py-8">
           <p className="text-red-500">{error || "Squad not found."}</p>
         </div>
-      </div>
+      </Layout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      <Navbar />
-
+    <Layout>
       <div className="max-w-6xl mx-auto px-6 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">{squad.name}</h1>
-            <p className="text-slate-500 dark:text-slate-400 text-sm">
-              {squad.memberCount} members • Admin: {squad.admin?.name}
-              {isAdmin && (
-                <span className="ml-2 text-[10px] font-semibold uppercase tracking-wide text-indigo-500 align-middle">
-                  You're the admin
-                </span>
-              )}
-            </p>
-          </div>
+        <SquadTabs squadId={squadId} squadName={squad.name} isAdmin={isAdmin} />
+
+        <div className="flex items-center justify-between mb-6 -mt-2">
+          <p className="text-slate-500 dark:text-slate-400 text-sm">
+            {squad.memberCount} members • Admin: {squad.admin?.name}
+            {isAdmin && (
+              <span className="ml-2 text-[10px] font-semibold uppercase tracking-wide text-indigo-500 align-middle">
+                You're the admin
+              </span>
+            )}
+          </p>
           <div className="flex items-center gap-4">
             {analytics && (
               <div className="text-right">
@@ -227,7 +240,14 @@ function Squad() {
               </h2>
 
               {habits.length === 0 ? (
-                <p className="text-slate-500 dark:text-slate-400 text-sm">No habits yet.</p>
+                <p className="text-slate-500 dark:text-slate-400 text-sm">
+                  No habits yet.{" "}
+                  {isAdmin && (
+                    <NavLink to={`/squad/${squadId}/add-habit`} className="text-blue-600 font-semibold">
+                      Add one
+                    </NavLink>
+                  )}
+                </p>
               ) : (
                 <div className="space-y-3">
                   {habits.map((habit) => (
@@ -242,37 +262,7 @@ function Squad() {
                   ))}
                 </div>
               )}
-
-              {/* Only the squad admin can add habits — members can only view/toggle them. */}
-              {isAdmin && (
-                <form onSubmit={handleCreateHabit} className="mt-4 flex gap-2">
-                  <input
-                    value={newHabitTitle}
-                    onChange={(e) => setNewHabitTitle(e.target.value)}
-                    placeholder="New habit e.g. Drink Water"
-                    className="flex-1 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200"
-                  />
-                  <button
-                    type="submit"
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold"
-                  >
-                    Add
-                  </button>
-                </form>
-              )}
             </div>
-
-            <MembersList members={leaderboard} />
-
-            <Leaderboard data={leaderboard} />
-          </div>
-
-          <div className="space-y-6">
-            <InviteLink
-              inviteToken={squad.inviteToken}
-              inviteExpiresAt={squad.inviteExpiresAt}
-              onRegenerate={handleRegenerateInvite}
-            />
 
             {analytics?.whoBrokeTheChain && (
               <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
@@ -305,9 +295,17 @@ function Squad() {
               </div>
             )}
           </div>
+
+          <div className="space-y-6">
+            <InviteLink
+              inviteToken={squad.inviteToken}
+              inviteExpiresAt={squad.inviteExpiresAt}
+              onRegenerate={handleRegenerateInvite}
+            />
+          </div>
         </div>
       </div>
-    </div>
+    </Layout>
   );
 }
 
