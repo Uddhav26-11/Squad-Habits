@@ -9,15 +9,13 @@ import Login from "./pages/Login";
 import AuthCallback from "./pages/AuthCallback";
 import Dashboard from "./pages/Dashboard";
 import Squad from "./pages/Squad";
-import Leaderboard from "./components/Leaderboard";
-import MembersList from "./components/MembersList";
-
-// import MyHabits from "./pages/MyHabits";
-// import JoinSquad from "./pages/JoinSquad";
+import SquadLeaderboard from "./pages/SquadLeaderboard";
+import SquadMembers from "./pages/SquadMembers";
+import AddHabit from "./pages/AddHabit";
+import MyHabits from "./pages/MyHabits";
+import JoinSquad from "./pages/JoinSquad";
 import Profile from "./pages/Profile";
 
-// Wraps every authenticated route with SquadProvider so the sidebar always
-// knows which squads the user belongs to and which one is "active".
 function WithSquads({ children }) {
   return <SquadProvider>{children}</SquadProvider>;
 }
