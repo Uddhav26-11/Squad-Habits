@@ -18,11 +18,11 @@ app.use(
 app.use(express.json());
 app.use(passport.initialize());
 
-app.use("/auth", require("./routes/authRoutes"));
-app.use("/squad", require("./routes/squadRoutes"));
-app.use("/habit", require("./routes/habitRoutes"));
+app.use("/api/auth", require("./routes/authRoutes"));
+app.use("/api/squad", require("./routes/squadRoutes"));
+app.use("/api/habit", require("./routes/habitRoutes"));
 
-// API health check (moved to /api/health so it doesn't block the frontend at "/")
+// API health check
 app.get("/api/health", (req, res) => {
   res.json({ message: "Squad Habits API is running" });
 });
@@ -31,23 +31,11 @@ app.get("/api/health", (req, res) => {
 const frontendDist = path.join(__dirname, "../frontend/dist");
 app.use(express.static(frontendDist));
 
-// Only these exact backend paths should be excluded from the SPA catch-all.
-// Previously the whole "/auth" prefix was excluded, which also blocked the
-// frontend's own /auth/callback page (used after Google OAuth redirect),
-// causing "Cannot GET /auth/callback" (404) after Google login.
-const BACKEND_ONLY_PATHS = [
-  "/auth/google",
-  "/auth/google/callback",
-  "/auth/register",
-  "/auth/login",
-  "/auth/me",
-  "/auth/logout",
-];
-
-app.get(/^(?!\/(squad|habit|api)).*/, (req, res, next) => {
-  if (BACKEND_ONLY_PATHS.includes(req.path)) {
-    return next();
-  }
+// Everything under /api is handled above (or falls through to Express's
+// own 404). Anything else is a frontend route — e.g. /login, /dashboard,
+// /squad/:id, /auth/callback — and should get index.html so React Router
+// can render it, even on a hard refresh/direct URL visit.
+app.get(/^(?!\/api).*/, (req, res) => {
   res.sendFile(path.join(frontendDist, "index.html"));
 });
 
