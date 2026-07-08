@@ -28,13 +28,32 @@ passport.use(
       try {
         console.log(`[passport] Google profile received: id=${profile.id} email=${profile.emails?.[0]?.value}`);
 
+        const email = profile.emails && profile.emails[0] ? profile.emails[0].value : "";
+
         let user = await User.findOne({ googleId: profile.id });
+
+        // If no user has this googleId yet, check by email first and link
+        // the Google account instead of creating a duplicate. Without this,
+        // an existing email/password user clicking "Continue with Google"
+        // would hit the unique index on `email` in User.create() below,
+        // throw, and the whole login would look like it silently failed.
+        if (!user && email) {
+          user = await User.findOne({ email });
+          if (user) {
+            user.googleId = profile.id;
+            if (!user.avatar && profile.photos && profile.photos[0]) {
+              user.avatar = profile.photos[0].value;
+            }
+            await user.save();
+            console.log(`[passport] Linked Google account to existing user: ${user._id}`);
+          }
+        }
 
         if (!user) {
           user = await User.create({
             googleId: profile.id,
             name: profile.displayName,
-            email: profile.emails && profile.emails[0] ? profile.emails[0].value : "",
+            email,
             avatar: profile.photos && profile.photos[0] ? profile.photos[0].value : "",
           });
           console.log(`[passport] Created new user from Google profile: ${user._id}`);

@@ -40,12 +40,13 @@ export function AuthProvider({ children }) {
   }, []);
 
   const login = async (token) => {
-    // Clear any stale state before applying the new token, so a leftover
-    // user object from a previous session can never leak into this login.
     setUser(null);
     sessionStorage.setItem("token", token);
     console.log("[AuthContext] New token stored for this tab, reloading user...");
     await loadUser();
+    // Return whether login actually succeeded, so callers (AuthCallback)
+    // can react instead of blindly navigating forward on failure.
+    return !!sessionStorage.getItem("token");
   };
 
   const logout = () => {
