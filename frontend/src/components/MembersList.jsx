@@ -8,8 +8,6 @@ function statusBadgeClasses(status) {
 function MembersList({ members = [] }) {
   return (
     <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
-      <h2 className="font-semibold text-lg text-slate-800 dark:text-slate-100 mb-4">Members</h2>
-
       {members.length === 0 ? (
         <p className="text-sm text-slate-500 dark:text-slate-400">No members yet.</p>
       ) : (
