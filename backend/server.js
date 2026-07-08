@@ -31,7 +31,23 @@ app.get("/api/health", (req, res) => {
 const frontendDist = path.join(__dirname, "../frontend/dist");
 app.use(express.static(frontendDist));
 
-app.get(/^(?!\/(auth|squad|habit|api)).*/, (req, res) => {
+// Only these exact backend paths should be excluded from the SPA catch-all.
+// Previously the whole "/auth" prefix was excluded, which also blocked the
+// frontend's own /auth/callback page (used after Google OAuth redirect),
+// causing "Cannot GET /auth/callback" (404) after Google login.
+const BACKEND_ONLY_PATHS = [
+  "/auth/google",
+  "/auth/google/callback",
+  "/auth/register",
+  "/auth/login",
+  "/auth/me",
+  "/auth/logout",
+];
+
+app.get(/^(?!\/(squad|habit|api)).*/, (req, res, next) => {
+  if (BACKEND_ONLY_PATHS.includes(req.path)) {
+    return next();
+  }
   res.sendFile(path.join(frontendDist, "index.html"));
 });
 
